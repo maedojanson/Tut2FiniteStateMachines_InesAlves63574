@@ -134,37 +134,38 @@ public class Patrol : State
 
     public override void Enter()
     {
-        anim.SetTrigger("isWalking");
-
-        if (GameEnvironment.Singleton.Checkpoints.Count > 0)
+        float lastDist = Mathf.Infinity;
+        for (int i = 0; i < GameEnvironment.Singleton.Checkpoints.Count; i++)
         {
-            currentIndex = 0;
-            agent.SetDestination(GameEnvironment.Singleton.Checkpoints[currentIndex].transform.position);
+            GameObject thisWP = GameEnvironment.Singleton.Checkpoints[i];
+            float distance = Vector3.Distance(npc.transform.position, thisWP.transform.position);
+            if (distance < lastDist)
+            {
+                currentIndex = i - 1;
+                lastDist = distance;
+            }
         }
 
+        anim.SetTrigger("isWalking");
         base.Enter();
     }
 
     public override void Update()
     {
+        if (agent.remainingDistance < 1)
+        {
+            if (currentIndex >= GameEnvironment.Singleton.Checkpoints.Count - 1)
+                currentIndex = 0;
+            else
+                currentIndex++;
+
+            agent.SetDestination(GameEnvironment.Singleton.Checkpoints[currentIndex].transform.position);
+        }
+
         if (CanSeePlayer())
         {
             nextState = new Pursue(npc, agent, anim, player);
             stage = EVENT.EXIT;
-            return;
-        }
-
-        if (GameEnvironment.Singleton.Checkpoints.Count > 0)
-        {
-            if (agent.remainingDistance < 1f && !agent.pathPending)
-            {
-                if (currentIndex >= GameEnvironment.Singleton.Checkpoints.Count - 1)
-                    currentIndex = 0;
-                else
-                    currentIndex++;
-
-                agent.SetDestination(GameEnvironment.Singleton.Checkpoints[currentIndex].transform.position);
-            }
         }
 
         base.Update();
@@ -243,12 +244,14 @@ public class Attack : State
     {
         anim.SetTrigger("isShooting");
         agent.isStopped = true;
+        shoot.Play();
         base.Enter();
     }
 
     public override void Update()
     {
         Vector3 direction = player.position - npc.transform.position;
+        float angle = Vector3.Angle(direction, npc.transform.forward);
         direction.y = 0;
 
         npc.transform.rotation = Quaternion.Slerp(
